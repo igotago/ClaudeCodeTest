@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Start-Process *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\igota\\\\OneDrive\\\\Claude\\\\Projects\\\\ClaudeCodeTest\" -Force)",
+      "Bash(Select-Object Name, FullName)"
+    ]
+  }
+}
