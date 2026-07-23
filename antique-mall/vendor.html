@@ -223,8 +223,8 @@
       return div.innerHTML;
     }
 
-    function populateVendorSelect() {
-      const vendors = getVendors();
+    async function populateVendorSelect() {
+      const vendors = await getVendors();
       const select = document.getElementById('vendor-select');
       const noVendorsMessage = document.getElementById('no-vendors-message');
       const previousValue = select.value;
@@ -252,18 +252,18 @@
 
       const stillExists = vendors.some((v) => v.id === previousValue);
       select.value = stillExists ? previousValue : vendors[0].id;
-      onVendorChange();
+      await onVendorChange();
     }
 
-    function onVendorChange() {
+    async function onVendorChange() {
       currentVendorId = document.getElementById('vendor-select').value;
       document.getElementById('item-form-card').style.display = 'block';
       document.getElementById('inventory-card').style.display = 'block';
-      renderInventory(currentVendorId);
+      await renderInventory(currentVendorId);
     }
 
-    function renderInventory(vendorId) {
-      const items = getInventoryByVendor(vendorId);
+    async function renderInventory(vendorId) {
+      const items = await getInventoryByVendor(vendorId);
       const tbody = document.getElementById('inventory-list');
       const emptyMessage = document.getElementById('inventory-empty-message');
       tbody.innerHTML = '';
@@ -283,7 +283,7 @@
       });
     }
 
-    function handleAddItem(e) {
+    async function handleAddItem(e) {
       e.preventDefault();
       if (!currentVendorId) return;
 
@@ -294,12 +294,12 @@
 
       if (!name || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) return;
 
-      addInventoryItem({ vendorId: currentVendorId, name, description, price, quantity });
+      await addInventoryItem({ vendorId: currentVendorId, name, description, price, quantity });
       document.getElementById('item-form').reset();
-      renderInventory(currentVendorId);
+      await renderInventory(currentVendorId);
     }
 
-    function handleUpdateItem(id, field, value) {
+    async function handleUpdateItem(id, field, value) {
       const patch = {};
       if (field === 'price') {
         const price = parseFloat(value);
@@ -310,13 +310,13 @@
         if (isNaN(quantity) || quantity < 0) return;
         patch.quantity = quantity;
       }
-      updateInventoryItem(id, patch);
+      await updateInventoryItem(id, patch);
     }
 
-    function handleDeleteItem(id) {
+    async function handleDeleteItem(id) {
       if (!confirm('Delete this item?')) return;
-      deleteInventoryItem(id);
-      renderInventory(currentVendorId);
+      await deleteInventoryItem(id);
+      await renderInventory(currentVendorId);
     }
 
     document.getElementById('vendor-select').addEventListener('change', onVendorChange);
@@ -328,19 +328,14 @@
       if (deleteBtn) handleDeleteItem(deleteBtn.dataset.id);
     });
 
-    document.getElementById('inventory-list').addEventListener('change', (e) => {
+    document.getElementById('inventory-list').addEventListener('change', async (e) => {
       if (e.target.classList.contains('item-price-input')) {
-        handleUpdateItem(e.target.dataset.id, 'price', e.target.value);
-        renderInventory(currentVendorId);
+        await handleUpdateItem(e.target.dataset.id, 'price', e.target.value);
+        await renderInventory(currentVendorId);
       } else if (e.target.classList.contains('item-qty-input')) {
-        handleUpdateItem(e.target.dataset.id, 'quantity', e.target.value);
-        renderInventory(currentVendorId);
+        await handleUpdateItem(e.target.dataset.id, 'quantity', e.target.value);
+        await renderInventory(currentVendorId);
       }
-    });
-
-    window.addEventListener('storage', () => {
-      populateVendorSelect();
-      if (currentVendorId) renderInventory(currentVendorId);
     });
 
     populateVendorSelect();

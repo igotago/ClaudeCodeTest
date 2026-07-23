@@ -1,33 +1,22 @@
 'use strict';
 /* exported formatCurrency, getVendors, addVendor, updateVendor, deleteVendor,
    getInventory, getInventoryByVendor, addInventoryItem, updateInventoryItem,
-   deleteInventoryItem, decrementStock, getSettings, saveSettings */
+   deleteInventoryItem, checkout, getSettings, saveSettings */
 
-const STORAGE_KEYS = {
-  vendors: 'antiqueMall.vendors',
-  inventory: 'antiqueMall.inventory',
-  settings: 'antiqueMall.settings',
-};
-
-function generateId(prefix) {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return `${prefix}-${crypto.randomUUID()}`;
+async function apiRequest(method, path, body) {
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const errorBody = await res.json().catch(() => ({}));
+    const error = new Error(errorBody.error || `Request failed: ${res.status}`);
+    error.status = res.status;
+    error.body = errorBody;
+    throw error;
   }
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function readJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJSON(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  return res.status === 204 ? null : res.json();
 }
 
 function formatCurrency(n) {
@@ -36,114 +25,56 @@ function formatCurrency(n) {
 
 // Vendors
 
-function getVendors() {
-  return readJSON(STORAGE_KEYS.vendors, []);
+async function getVendors() {
+  return apiRequest('GET', '/vendors');
 }
 
-function saveVendors(vendors) {
-  writeJSON(STORAGE_KEYS.vendors, vendors);
+async function addVendor(vendor) {
+  return apiRequest('POST', '/vendors', vendor);
 }
 
-function addVendor({ name, phone, email, boothNumber }) {
-  const vendors = getVendors();
-  const vendor = {
-    id: generateId('v'),
-    name,
-    phone,
-    email,
-    boothNumber: boothNumber || '',
-    createdAt: new Date().toISOString(),
-  };
-  vendors.push(vendor);
-  saveVendors(vendors);
-  return vendor;
+async function updateVendor(id, patch) {
+  return apiRequest('PATCH', `/vendors/${id}`, patch);
 }
 
-function updateVendor(id, patch) {
-  const vendors = getVendors();
-  const index = vendors.findIndex((v) => v.id === id);
-  if (index === -1) return null;
-  vendors[index] = { ...vendors[index], ...patch };
-  saveVendors(vendors);
-  return vendors[index];
-}
-
-function deleteVendor(id) {
-  const vendors = getVendors().filter((v) => v.id !== id);
-  saveVendors(vendors);
-  const inventory = getInventory();
-  const remaining = inventory.filter((item) => item.vendorId !== id);
-  const removedItemCount = inventory.length - remaining.length;
-  saveInventory(remaining);
-  return { removedItemCount };
+async function deleteVendor(id) {
+  return apiRequest('DELETE', `/vendors/${id}`);
 }
 
 // Inventory
 
-function getInventory() {
-  return readJSON(STORAGE_KEYS.inventory, []);
+async function getInventory() {
+  return apiRequest('GET', '/inventory');
 }
 
-function saveInventory(items) {
-  writeJSON(STORAGE_KEYS.inventory, items);
+async function getInventoryByVendor(vendorId) {
+  return apiRequest('GET', `/inventory?vendorId=${encodeURIComponent(vendorId)}`);
 }
 
-function getInventoryByVendor(vendorId) {
-  return getInventory().filter((item) => item.vendorId === vendorId);
+async function addInventoryItem(item) {
+  return apiRequest('POST', '/inventory', item);
 }
 
-function addInventoryItem({ vendorId, name, description, price, quantity }) {
-  const items = getInventory();
-  const item = {
-    id: generateId('i'),
-    vendorId,
-    name,
-    description: description || '',
-    price,
-    quantity,
-    createdAt: new Date().toISOString(),
-  };
-  items.push(item);
-  saveInventory(items);
-  return item;
+async function updateInventoryItem(id, patch) {
+  return apiRequest('PATCH', `/inventory/${id}`, patch);
 }
 
-function updateInventoryItem(id, patch) {
-  const items = getInventory();
-  const index = items.findIndex((item) => item.id === id);
-  if (index === -1) return null;
-  items[index] = { ...items[index], ...patch };
-  saveInventory(items);
-  return items[index];
+async function deleteInventoryItem(id) {
+  return apiRequest('DELETE', `/inventory/${id}`);
 }
 
-function deleteInventoryItem(id) {
-  const items = getInventory().filter((item) => item.id !== id);
-  saveInventory(items);
-}
+// Sales
 
-function decrementStock(itemId, qty) {
-  const items = getInventory();
-  const index = items.findIndex((item) => item.id === itemId);
-  if (index === -1) return null;
-  if (qty > items[index].quantity) return null;
-  items[index] = { ...items[index], quantity: items[index].quantity - qty };
-  saveInventory(items);
-  return items[index];
+async function checkout(lines) {
+  return apiRequest('POST', '/sales', { lines });
 }
 
 // Settings
 
-function getSettings() {
-  const settings = readJSON(STORAGE_KEYS.settings, null);
-  if (settings === null) {
-    const defaults = { taxRate: 0.08 };
-    saveSettings(defaults);
-    return defaults;
-  }
-  return settings;
+async function getSettings() {
+  return apiRequest('GET', '/settings');
 }
 
-function saveSettings(settings) {
-  writeJSON(STORAGE_KEYS.settings, settings);
+async function saveSettings(settings) {
+  return apiRequest('PUT', '/settings', settings);
 }

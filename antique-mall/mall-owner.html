@@ -221,17 +221,20 @@
     'use strict';
 
     let editingVendorId = null;
+    let vendorsCache = [];
+    let inventoryCache = [];
 
-    function renderVendors() {
-      const vendors = getVendors();
+    async function renderVendors() {
+      vendorsCache = await getVendors();
+      inventoryCache = await getInventory();
       const tbody = document.getElementById('vendor-list');
       const emptyMessage = document.getElementById('vendor-empty-message');
       tbody.innerHTML = '';
 
-      emptyMessage.style.display = vendors.length === 0 ? 'block' : 'none';
+      emptyMessage.style.display = vendorsCache.length === 0 ? 'block' : 'none';
 
-      vendors.forEach((v) => {
-        const itemCount = getInventoryByVendor(v.id).length;
+      vendorsCache.forEach((v) => {
+        const itemCount = inventoryCache.filter((i) => i.vendorId === v.id).length;
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${escapeHtml(v.name)}</td>
@@ -263,7 +266,7 @@
     }
 
     function startEditVendor(id) {
-      const vendor = getVendors().find((v) => v.id === id);
+      const vendor = vendorsCache.find((v) => v.id === id);
       if (!vendor) return;
       editingVendorId = id;
       document.getElementById('vendor-name').value = vendor.name;
@@ -276,7 +279,7 @@
       document.getElementById('vendor-name').focus();
     }
 
-    function handleVendorFormSubmit(e) {
+    async function handleVendorFormSubmit(e) {
       e.preventDefault();
       const name = document.getElementById('vendor-name').value.trim();
       const phone = document.getElementById('vendor-phone').value.trim();
@@ -286,26 +289,26 @@
       if (!name || !phone || !email) return;
 
       if (editingVendorId) {
-        updateVendor(editingVendorId, { name, phone, email, boothNumber });
+        await updateVendor(editingVendorId, { name, phone, email, boothNumber });
       } else {
-        addVendor({ name, phone, email, boothNumber });
+        await addVendor({ name, phone, email, boothNumber });
       }
 
       resetVendorForm();
-      renderVendors();
+      await renderVendors();
     }
 
-    function handleDeleteVendor(id) {
-      const vendor = getVendors().find((v) => v.id === id);
+    async function handleDeleteVendor(id) {
+      const vendor = vendorsCache.find((v) => v.id === id);
       if (!vendor) return;
-      const itemCount = getInventoryByVendor(id).length;
+      const itemCount = inventoryCache.filter((i) => i.vendorId === id).length;
       const message = itemCount > 0
         ? `Delete ${vendor.name}? This will also delete their ${itemCount} inventory item(s).`
         : `Delete ${vendor.name}?`;
       if (!confirm(message)) return;
-      deleteVendor(id);
+      await deleteVendor(id);
       if (editingVendorId === id) resetVendorForm();
-      renderVendors();
+      await renderVendors();
     }
 
     document.getElementById('vendor-form').addEventListener('submit', handleVendorFormSubmit);
@@ -318,8 +321,6 @@
       if (editBtn) startEditVendor(editBtn.dataset.id);
       if (deleteBtn) handleDeleteVendor(deleteBtn.dataset.id);
     });
-
-    window.addEventListener('storage', renderVendors);
 
     renderVendors();
   </script>

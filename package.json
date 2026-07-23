@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "eslint *.html antique-mall",
+    "start": "node antique-mall/server/app.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
@@ -21,6 +22,9 @@
     "url": "https://github.com/igotago/ClaudeCodeTest/issues"
   },
   "homepage": "https://github.com/igotago/ClaudeCodeTest#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "eslint": "^10.4.1",

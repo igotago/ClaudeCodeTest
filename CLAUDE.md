@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Static HTML/JS browser games — no build step, no package manager, no bundler. Each game is a single self-contained `.html` file. Open directly in a browser to run.
 
+Exception: `antique-mall/` is a small Node/Express/SQLite app, not a static game — see `antique-mall/CLAUDE.md`.
+
 ## Code style
 
 - 2-space indentation throughout
