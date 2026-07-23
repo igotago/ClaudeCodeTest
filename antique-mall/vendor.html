@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antique Mall — Vendor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #e94560;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      color: #aaddff;
+      margin-bottom: 0.8rem;
+    }
+
+    nav {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    nav a {
+      color: #aaddff;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      background: #16213e;
+      transition: background 0.15s;
+    }
+
+    nav a:hover {
+      background: #0f3460;
+    }
+
+    nav a.active {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      max-width: 800px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-bottom: 0.8rem;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      color: #aaddff;
+      gap: 0.3rem;
+      flex: 1 1 160px;
+    }
+
+    input, select {
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      background: #1a1a2e;
+      color: #eee;
+      font-size: 1rem;
+    }
+
+    input:focus, select:focus {
+      outline: 2px solid #e94560;
+    }
+
+    button {
+      padding: 0.6rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #e94560;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button:hover {
+      background: #c73652;
+      transform: scale(1.03);
+    }
+
+    button.danger {
+      background: transparent;
+      border: 1px solid #e94560;
+      color: #e94560;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    button.danger:hover {
+      background: #e94560;
+      color: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    th {
+      color: #aaddff;
+      font-weight: normal;
+      font-size: 0.85rem;
+    }
+
+    td input {
+      width: 90px;
+      padding: 0.3rem;
+    }
+
+    .empty-message, .info-message {
+      color: #888;
+      font-style: italic;
+      padding: 1rem 0;
+    }
+
+    #vendor-picker {
+      max-width: 400px;
+      margin-bottom: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="mall-owner.html">Mall Owner</a>
+    <a href="pos.html">Point of Sale</a>
+    <a href="vendor.html" class="active">Vendor</a>
+  </nav>
+
+  <h1>Vendor Inventory</h1>
+
+  <div class="card" id="vendor-picker">
+    <h2>Who are you?</h2>
+    <label>Vendor
+      <select id="vendor-select"></select>
+    </label>
+    <div id="no-vendors-message" class="info-message" style="display: none;">
+      No vendors yet — ask the Mall Owner to add you first.
+    </div>
+  </div>
+
+  <div class="card" id="item-form-card" style="display: none;">
+    <h2>Add Inventory Item</h2>
+    <form id="item-form">
+      <div class="form-row">
+        <label>Name
+          <input type="text" id="item-name" required />
+        </label>
+        <label>Description
+          <input type="text" id="item-description" />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Price ($)
+          <input type="number" id="item-price" min="0" step="0.01" required />
+        </label>
+        <label>Quantity
+          <input type="number" id="item-quantity" min="0" step="1" required />
+        </label>
+      </div>
+      <button type="submit">Add Item</button>
+    </form>
+  </div>
+
+  <div class="card" id="inventory-card" style="display: none;">
+    <h2>Your Inventory</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Price ($)</th>
+          <th>Quantity</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="inventory-list"></tbody>
+    </table>
+    <div id="inventory-empty-message" class="empty-message" style="display: none;">No inventory yet. Add an item above.</div>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    'use strict';
+
+    let currentVendorId = null;
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str == null ? '' : str;
+      return div.innerHTML;
+    }
+
+    function populateVendorSelect() {
+      const vendors = getVendors();
+      const select = document.getElementById('vendor-select');
+      const noVendorsMessage = document.getElementById('no-vendors-message');
+      const previousValue = select.value;
+
+      select.innerHTML = '';
+
+      if (vendors.length === 0) {
+        noVendorsMessage.style.display = 'block';
+        select.style.display = 'none';
+        document.getElementById('item-form-card').style.display = 'none';
+        document.getElementById('inventory-card').style.display = 'none';
+        currentVendorId = null;
+        return;
+      }
+
+      noVendorsMessage.style.display = 'none';
+      select.style.display = 'block';
+
+      vendors.forEach((v) => {
+        const option = document.createElement('option');
+        option.value = v.id;
+        option.textContent = v.boothNumber ? `${v.name} (Booth ${v.boothNumber})` : v.name;
+        select.appendChild(option);
+      });
+
+      const stillExists = vendors.some((v) => v.id === previousValue);
+      select.value = stillExists ? previousValue : vendors[0].id;
+      onVendorChange();
+    }
+
+    function onVendorChange() {
+      currentVendorId = document.getElementById('vendor-select').value;
+      document.getElementById('item-form-card').style.display = 'block';
+      document.getElementById('inventory-card').style.display = 'block';
+      renderInventory(currentVendorId);
+    }
+
+    function renderInventory(vendorId) {
+      const items = getInventoryByVendor(vendorId);
+      const tbody = document.getElementById('inventory-list');
+      const emptyMessage = document.getElementById('inventory-empty-message');
+      tbody.innerHTML = '';
+
+      emptyMessage.style.display = items.length === 0 ? 'block' : 'none';
+
+      items.forEach((item) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(item.name)}</td>
+          <td>${escapeHtml(item.description)}</td>
+          <td><input type="number" class="item-price-input" data-id="${item.id}" min="0" step="0.01" value="${item.price}" /></td>
+          <td><input type="number" class="item-qty-input" data-id="${item.id}" min="0" step="1" value="${item.quantity}" /></td>
+          <td><button type="button" class="danger delete-item-btn" data-id="${item.id}">Delete</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function handleAddItem(e) {
+      e.preventDefault();
+      if (!currentVendorId) return;
+
+      const name = document.getElementById('item-name').value.trim();
+      const description = document.getElementById('item-description').value.trim();
+      const price = parseFloat(document.getElementById('item-price').value);
+      const quantity = parseInt(document.getElementById('item-quantity').value, 10);
+
+      if (!name || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) return;
+
+      addInventoryItem({ vendorId: currentVendorId, name, description, price, quantity });
+      document.getElementById('item-form').reset();
+      renderInventory(currentVendorId);
+    }
+
+    function handleUpdateItem(id, field, value) {
+      const patch = {};
+      if (field === 'price') {
+        const price = parseFloat(value);
+        if (isNaN(price) || price < 0) return;
+        patch.price = price;
+      } else if (field === 'quantity') {
+        const quantity = parseInt(value, 10);
+        if (isNaN(quantity) || quantity < 0) return;
+        patch.quantity = quantity;
+      }
+      updateInventoryItem(id, patch);
+    }
+
+    function handleDeleteItem(id) {
+      if (!confirm('Delete this item?')) return;
+      deleteInventoryItem(id);
+      renderInventory(currentVendorId);
+    }
+
+    document.getElementById('vendor-select').addEventListener('change', onVendorChange);
+
+    document.getElementById('item-form').addEventListener('submit', handleAddItem);
+
+    document.getElementById('inventory-list').addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.delete-item-btn');
+      if (deleteBtn) handleDeleteItem(deleteBtn.dataset.id);
+    });
+
+    document.getElementById('inventory-list').addEventListener('change', (e) => {
+      if (e.target.classList.contains('item-price-input')) {
+        handleUpdateItem(e.target.dataset.id, 'price', e.target.value);
+        renderInventory(currentVendorId);
+      } else if (e.target.classList.contains('item-qty-input')) {
+        handleUpdateItem(e.target.dataset.id, 'quantity', e.target.value);
+        renderInventory(currentVendorId);
+      }
+    });
+
+    window.addEventListener('storage', () => {
+      populateVendorSelect();
+      if (currentVendorId) renderInventory(currentVendorId);
+    });
+
+    populateVendorSelect();
+  </script>
+</body>
+</html>

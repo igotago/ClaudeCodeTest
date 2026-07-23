@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antique Mall — Mall Owner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #e94560;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      color: #aaddff;
+      margin-bottom: 0.8rem;
+    }
+
+    nav {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    nav a {
+      color: #aaddff;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      background: #16213e;
+      transition: background 0.15s;
+    }
+
+    nav a:hover {
+      background: #0f3460;
+    }
+
+    nav a.active {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      max-width: 700px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin-bottom: 0.8rem;
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      color: #aaddff;
+      gap: 0.3rem;
+      flex: 1 1 200px;
+    }
+
+    input {
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      background: #1a1a2e;
+      color: #eee;
+      font-size: 1rem;
+    }
+
+    input:focus {
+      outline: 2px solid #e94560;
+    }
+
+    button {
+      padding: 0.6rem 1.5rem;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      background: #e94560;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button:hover {
+      background: #c73652;
+      transform: scale(1.03);
+    }
+
+    button.secondary {
+      background: #0f3460;
+    }
+
+    button.secondary:hover {
+      background: #1b4b7a;
+    }
+
+    button.danger {
+      background: transparent;
+      border: 1px solid #e94560;
+      color: #e94560;
+    }
+
+    button.danger:hover {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.6rem;
+      border-bottom: 1px solid #0f3460;
+    }
+
+    th {
+      color: #aaddff;
+      font-weight: normal;
+      font-size: 0.85rem;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .row-actions button {
+      padding: 0.3rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    .empty-message {
+      color: #888;
+      font-style: italic;
+      padding: 1rem 0;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="mall-owner.html" class="active">Mall Owner</a>
+    <a href="pos.html">Point of Sale</a>
+    <a href="vendor.html">Vendor</a>
+  </nav>
+
+  <h1>Vendor Management</h1>
+
+  <div class="card">
+    <h2 id="form-title">Add Vendor</h2>
+    <form id="vendor-form">
+      <div class="form-row">
+        <label>Name
+          <input type="text" id="vendor-name" required />
+        </label>
+        <label>Phone
+          <input type="tel" id="vendor-phone" required />
+        </label>
+      </div>
+      <div class="form-row">
+        <label>Email
+          <input type="email" id="vendor-email" required />
+        </label>
+        <label>Booth # (optional)
+          <input type="text" id="vendor-booth" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" id="vendor-submit-btn">Add Vendor</button>
+        <button type="button" id="vendor-cancel-edit-btn" class="secondary" style="display: none;">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Vendors</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Booth</th>
+          <th>Items</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="vendor-list"></tbody>
+    </table>
+    <div id="vendor-empty-message" class="empty-message" style="display: none;">No vendors yet. Add one above.</div>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    'use strict';
+
+    let editingVendorId = null;
+
+    function renderVendors() {
+      const vendors = getVendors();
+      const tbody = document.getElementById('vendor-list');
+      const emptyMessage = document.getElementById('vendor-empty-message');
+      tbody.innerHTML = '';
+
+      emptyMessage.style.display = vendors.length === 0 ? 'block' : 'none';
+
+      vendors.forEach((v) => {
+        const itemCount = getInventoryByVendor(v.id).length;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(v.name)}</td>
+          <td>${escapeHtml(v.phone)}</td>
+          <td>${escapeHtml(v.email)}</td>
+          <td>${escapeHtml(v.boothNumber)}</td>
+          <td>${itemCount}</td>
+          <td class="row-actions">
+            <button type="button" class="secondary edit-vendor-btn" data-id="${v.id}">Edit</button>
+            <button type="button" class="danger delete-vendor-btn" data-id="${v.id}">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str == null ? '' : str;
+      return div.innerHTML;
+    }
+
+    function resetVendorForm() {
+      document.getElementById('vendor-form').reset();
+      editingVendorId = null;
+      document.getElementById('form-title').textContent = 'Add Vendor';
+      document.getElementById('vendor-submit-btn').textContent = 'Add Vendor';
+      document.getElementById('vendor-cancel-edit-btn').style.display = 'none';
+    }
+
+    function startEditVendor(id) {
+      const vendor = getVendors().find((v) => v.id === id);
+      if (!vendor) return;
+      editingVendorId = id;
+      document.getElementById('vendor-name').value = vendor.name;
+      document.getElementById('vendor-phone').value = vendor.phone;
+      document.getElementById('vendor-email').value = vendor.email;
+      document.getElementById('vendor-booth').value = vendor.boothNumber;
+      document.getElementById('form-title').textContent = 'Edit Vendor';
+      document.getElementById('vendor-submit-btn').textContent = 'Update Vendor';
+      document.getElementById('vendor-cancel-edit-btn').style.display = 'inline-block';
+      document.getElementById('vendor-name').focus();
+    }
+
+    function handleVendorFormSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('vendor-name').value.trim();
+      const phone = document.getElementById('vendor-phone').value.trim();
+      const email = document.getElementById('vendor-email').value.trim();
+      const boothNumber = document.getElementById('vendor-booth').value.trim();
+
+      if (!name || !phone || !email) return;
+
+      if (editingVendorId) {
+        updateVendor(editingVendorId, { name, phone, email, boothNumber });
+      } else {
+        addVendor({ name, phone, email, boothNumber });
+      }
+
+      resetVendorForm();
+      renderVendors();
+    }
+
+    function handleDeleteVendor(id) {
+      const vendor = getVendors().find((v) => v.id === id);
+      if (!vendor) return;
+      const itemCount = getInventoryByVendor(id).length;
+      const message = itemCount > 0
+        ? `Delete ${vendor.name}? This will also delete their ${itemCount} inventory item(s).`
+        : `Delete ${vendor.name}?`;
+      if (!confirm(message)) return;
+      deleteVendor(id);
+      if (editingVendorId === id) resetVendorForm();
+      renderVendors();
+    }
+
+    document.getElementById('vendor-form').addEventListener('submit', handleVendorFormSubmit);
+
+    document.getElementById('vendor-cancel-edit-btn').addEventListener('click', resetVendorForm);
+
+    document.getElementById('vendor-list').addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.edit-vendor-btn');
+      const deleteBtn = e.target.closest('.delete-vendor-btn');
+      if (editBtn) startEditVendor(editBtn.dataset.id);
+      if (deleteBtn) handleDeleteVendor(deleteBtn.dataset.id);
+    });
+
+    window.addEventListener('storage', renderVendors);
+
+    renderVendors();
+  </script>
+</body>
+</html>

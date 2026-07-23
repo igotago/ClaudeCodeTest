@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Antique Mall — Point of Sale</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+      color: #eee;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #e94560;
+      margin-bottom: 1rem;
+    }
+
+    h2 {
+      font-size: 1.2rem;
+      color: #aaddff;
+      margin-bottom: 0.8rem;
+    }
+
+    nav {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    nav a {
+      color: #aaddff;
+      text-decoration: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      background: #16213e;
+      transition: background 0.15s;
+    }
+
+    nav a:hover {
+      background: #0f3460;
+    }
+
+    nav a.active {
+      background: #e94560;
+      color: #fff;
+    }
+
+    .layout {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      align-items: flex-start;
+    }
+
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      flex: 1 1 380px;
+    }
+
+    input {
+      padding: 0.5rem;
+      border-radius: 6px;
+      border: 1px solid #0f3460;
+      background: #1a1a2e;
+      color: #eee;
+      font-size: 1rem;
+      width: 100%;
+    }
+
+    input:focus {
+      outline: 2px solid #e94560;
+    }
+
+    button {
+      padding: 0.5rem 1.2rem;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 8px;
+      background: #e94560;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #c73652;
+      transform: scale(1.03);
+    }
+
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+    }
+
+    button.secondary {
+      background: #0f3460;
+    }
+
+    button.secondary:hover:not(:disabled) {
+      background: #1b4b7a;
+    }
+
+    button.big {
+      width: 100%;
+      padding: 0.9rem;
+      font-size: 1.1rem;
+      margin-top: 1rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.5rem;
+      border-bottom: 1px solid #0f3460;
+      font-size: 0.9rem;
+    }
+
+    th {
+      color: #aaddff;
+      font-weight: normal;
+      font-size: 0.8rem;
+    }
+
+    .cart-qty-input {
+      width: 55px;
+      padding: 0.3rem;
+    }
+
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.4rem 0;
+      font-size: 1rem;
+    }
+
+    .totals-row.total {
+      font-size: 1.3rem;
+      color: #aaddff;
+      border-top: 1px solid #0f3460;
+      margin-top: 0.5rem;
+      padding-top: 0.8rem;
+    }
+
+    .tax-rate-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      color: #aaddff;
+    }
+
+    .tax-rate-row input {
+      width: 70px;
+    }
+
+    .empty-message {
+      color: #888;
+      font-style: italic;
+      padding: 1rem 0;
+    }
+
+    .line-error {
+      color: #e94560;
+      font-size: 0.8rem;
+    }
+
+    #sale-success-message {
+      color: #a8dadc;
+      font-weight: bold;
+      margin-top: 1rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="mall-owner.html">Mall Owner</a>
+    <a href="pos.html" class="active">Point of Sale</a>
+    <a href="vendor.html">Vendor</a>
+  </nav>
+
+  <h1>Point of Sale</h1>
+
+  <div class="layout">
+    <div class="card">
+      <h2>Search Inventory</h2>
+      <input type="text" id="item-search" placeholder="Search by name or description..." />
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Vendor</th>
+            <th>Price</th>
+            <th>In Stock</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="search-results"></tbody>
+      </table>
+      <div id="search-empty-message" class="empty-message" style="display: none;">No items found.</div>
+    </div>
+
+    <div class="card">
+      <h2>Cart</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Vendor</th>
+            <th>Price</th>
+            <th>Qty</th>
+            <th>Line Total</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="cart-list"></tbody>
+      </table>
+      <div id="cart-empty-message" class="empty-message" style="display: none;">Cart is empty.</div>
+
+      <div class="tax-rate-row">
+        <label for="tax-rate-input">Tax rate (%)</label>
+        <input type="number" id="tax-rate-input" min="0" step="0.1" />
+      </div>
+
+      <div class="totals-row">
+        <span>Subtotal</span>
+        <span id="subtotal-value">$0.00</span>
+      </div>
+      <div class="totals-row">
+        <span id="tax-label">Tax</span>
+        <span id="tax-value">$0.00</span>
+      </div>
+      <div class="totals-row total">
+        <span>Total</span>
+        <span id="total-value">$0.00</span>
+      </div>
+
+      <button type="button" id="complete-sale-btn" class="big">Complete Sale</button>
+      <button type="button" id="clear-cart-btn" class="secondary big">Clear Cart</button>
+      <div id="sale-success-message"></div>
+    </div>
+  </div>
+
+  <script src="data.js"></script>
+  <script>
+    'use strict';
+
+    const cart = {};
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str == null ? '' : str;
+      return div.innerHTML;
+    }
+
+    function getVendorName(vendorId) {
+      const vendor = getVendors().find((v) => v.id === vendorId);
+      return vendor ? vendor.name : 'Unknown vendor';
+    }
+
+    function renderSearchResults(query) {
+      const q = query.trim().toLowerCase();
+      const items = getInventory().filter((item) => {
+        if (!q) return true;
+        return item.name.toLowerCase().includes(q) || item.description.toLowerCase().includes(q);
+      });
+
+      const tbody = document.getElementById('search-results');
+      const emptyMessage = document.getElementById('search-empty-message');
+      tbody.innerHTML = '';
+      emptyMessage.style.display = items.length === 0 ? 'block' : 'none';
+
+      items.forEach((item) => {
+        const inCartQty = cart[item.id] ? cart[item.id].qtyInCart : 0;
+        const remaining = item.quantity - inCartQty;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(item.name)}</td>
+          <td>${escapeHtml(getVendorName(item.vendorId))}</td>
+          <td>${formatCurrency(item.price)}</td>
+          <td>${remaining}</td>
+          <td><button type="button" class="add-to-cart-btn" data-id="${item.id}" ${remaining <= 0 ? 'disabled' : ''}>Add</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function addToCart(itemId) {
+      const item = getInventory().find((i) => i.id === itemId);
+      if (!item) return;
+      const inCartQty = cart[itemId] ? cart[itemId].qtyInCart : 0;
+      if (inCartQty >= item.quantity) return;
+
+      if (cart[itemId]) {
+        cart[itemId].qtyInCart += 1;
+      } else {
+        cart[itemId] = {
+          itemId: item.id,
+          vendorId: item.vendorId,
+          name: item.name,
+          unitPrice: item.price,
+          qtyInCart: 1,
+        };
+      }
+      renderCart();
+      renderSearchResults(document.getElementById('item-search').value);
+    }
+
+    function updateCartQty(itemId, qty) {
+      const item = getInventory().find((i) => i.id === itemId);
+      if (!item || !cart[itemId]) return;
+      const clamped = Math.max(1, Math.min(qty, item.quantity));
+      cart[itemId].qtyInCart = clamped;
+      renderCart();
+      renderSearchResults(document.getElementById('item-search').value);
+    }
+
+    function removeFromCart(itemId) {
+      delete cart[itemId];
+      renderCart();
+      renderSearchResults(document.getElementById('item-search').value);
+    }
+
+    function computeTotals() {
+      const subtotal = Object.values(cart).reduce((sum, line) => sum + line.unitPrice * line.qtyInCart, 0);
+      const taxRate = getSettings().taxRate;
+      const tax = subtotal * taxRate;
+      const total = subtotal + tax;
+      return { subtotal, tax, total, taxRate };
+    }
+
+    function renderCart() {
+      const tbody = document.getElementById('cart-list');
+      const emptyMessage = document.getElementById('cart-empty-message');
+      const lines = Object.values(cart);
+      tbody.innerHTML = '';
+      emptyMessage.style.display = lines.length === 0 ? 'block' : 'none';
+
+      lines.forEach((line) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(line.name)}</td>
+          <td>${escapeHtml(getVendorName(line.vendorId))}</td>
+          <td>${formatCurrency(line.unitPrice)}</td>
+          <td><input type="number" class="cart-qty-input" data-id="${line.itemId}" min="1" value="${line.qtyInCart}" /></td>
+          <td>${formatCurrency(line.unitPrice * line.qtyInCart)}</td>
+          <td><button type="button" class="secondary remove-from-cart-btn" data-id="${line.itemId}">Remove</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const { subtotal, tax, total, taxRate } = computeTotals();
+      document.getElementById('subtotal-value').textContent = formatCurrency(subtotal);
+      document.getElementById('tax-label').textContent = `Tax (${(taxRate * 100).toFixed(1)}%)`;
+      document.getElementById('tax-value').textContent = formatCurrency(tax);
+      document.getElementById('total-value').textContent = formatCurrency(total);
+    }
+
+    function completeSale() {
+      const lines = Object.values(cart);
+      if (lines.length === 0) return;
+
+      const failures = [];
+      lines.forEach((line) => {
+        const result = decrementStock(line.itemId, line.qtyInCart);
+        if (result === null) {
+          const current = getInventory().find((i) => i.id === line.itemId);
+          const available = current ? current.quantity : 0;
+          failures.push({ itemId: line.itemId, name: line.name, available });
+        }
+      });
+
+      if (failures.length > 0) {
+        failures.forEach((f) => {
+          if (f.available <= 0) {
+            delete cart[f.itemId];
+          } else {
+            cart[f.itemId].qtyInCart = f.available;
+          }
+        });
+        renderCart();
+        renderSearchResults(document.getElementById('item-search').value);
+        alert(
+          `Some items changed stock before checkout and were adjusted: ${failures.map((f) => f.name).join(', ')}. Please review the cart and try again.`
+        );
+        return;
+      }
+
+      const { total } = computeTotals();
+      Object.keys(cart).forEach((key) => delete cart[key]);
+      renderCart();
+      renderSearchResults(document.getElementById('item-search').value);
+
+      const successMessage = document.getElementById('sale-success-message');
+      successMessage.textContent = `Sale complete — total ${formatCurrency(total)}`;
+      successMessage.style.display = 'block';
+      setTimeout(() => {
+        successMessage.style.display = 'none';
+      }, 4000);
+    }
+
+    function onTaxRateChange(e) {
+      const value = parseFloat(e.target.value);
+      if (isNaN(value) || value < 0) return;
+      saveSettings({ taxRate: value / 100 });
+      renderCart();
+    }
+
+    document.getElementById('item-search').addEventListener('input', (e) => {
+      renderSearchResults(e.target.value);
+    });
+
+    document.getElementById('search-results').addEventListener('click', (e) => {
+      const addBtn = e.target.closest('.add-to-cart-btn');
+      if (addBtn) addToCart(addBtn.dataset.id);
+    });
+
+    document.getElementById('cart-list').addEventListener('change', (e) => {
+      if (e.target.classList.contains('cart-qty-input')) {
+        updateCartQty(e.target.dataset.id, parseInt(e.target.value, 10) || 1);
+      }
+    });
+
+    document.getElementById('cart-list').addEventListener('click', (e) => {
+      const removeBtn = e.target.closest('.remove-from-cart-btn');
+      if (removeBtn) removeFromCart(removeBtn.dataset.id);
+    });
+
+    document.getElementById('tax-rate-input').addEventListener('change', onTaxRateChange);
+
+    document.getElementById('complete-sale-btn').addEventListener('click', completeSale);
+
+    document.getElementById('clear-cart-btn').addEventListener('click', () => {
+      if (Object.keys(cart).length === 0) return;
+      if (!confirm('Clear the cart?')) return;
+      Object.keys(cart).forEach((key) => delete cart[key]);
+      renderCart();
+      renderSearchResults(document.getElementById('item-search').value);
+    });
+
+    window.addEventListener('storage', () => {
+      renderSearchResults(document.getElementById('item-search').value);
+      renderCart();
+    });
+
+    document.getElementById('tax-rate-input').value = (getSettings().taxRate * 100).toFixed(1);
+    renderSearchResults('');
+    renderCart();
+  </script>
+</body>
+</html>
