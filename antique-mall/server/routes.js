@@ -1,9 +1,6 @@
 'use strict';
 
-const express = require('express');
 const { db, generateId, transaction } = require('./db');
-
-const router = express.Router();
 
 class InsufficientStockError extends Error {
   constructor(failures) {
@@ -12,18 +9,20 @@ class InsufficientStockError extends Error {
   }
 }
 
+class NotFoundError extends Error {}
+
 function nowIso() {
   return new Date().toISOString();
 }
 
 // Vendors
 
-router.get('/vendors', (req, res) => {
-  res.json(db.prepare('SELECT * FROM vendors ORDER BY createdAt').all());
-});
+function listVendors() {
+  return db.prepare('SELECT * FROM vendors ORDER BY createdAt').all();
+}
 
-router.post('/vendors', (req, res) => {
-  const { name, phone, email, boothNumber } = req.body;
+function createVendor(body) {
+  const { name, phone, email, boothNumber } = body;
   const vendor = {
     id: generateId('v'),
     name,
@@ -35,43 +34,40 @@ router.post('/vendors', (req, res) => {
   db.prepare(
     'INSERT INTO vendors (id, name, phone, email, boothNumber, createdAt) VALUES (@id, @name, @phone, @email, @boothNumber, @createdAt)'
   ).run(vendor);
-  res.status(201).json(vendor);
-});
+  return vendor;
+}
 
-router.patch('/vendors/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not_found' });
-  const updated = { ...existing, ...req.body, id: existing.id };
+function updateVendor(id, body) {
+  const existing = db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
+  if (!existing) throw new NotFoundError();
+  const updated = { ...existing, ...body, id: existing.id };
   db.prepare(
     'UPDATE vendors SET name = @name, phone = @phone, email = @email, boothNumber = @boothNumber WHERE id = @id'
   ).run({ name: updated.name, phone: updated.phone, email: updated.email, boothNumber: updated.boothNumber, id: updated.id });
-  res.json(updated);
-});
+  return updated;
+}
 
-router.delete('/vendors/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM vendors WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not_found' });
-  const removedItemCount = transaction(() => {
-    const count = db.prepare('SELECT COUNT(*) AS count FROM inventory WHERE vendorId = ?').get(req.params.id).count;
-    db.prepare('DELETE FROM inventory WHERE vendorId = ?').run(req.params.id);
-    db.prepare('DELETE FROM vendors WHERE id = ?').run(req.params.id);
-    return count;
+function deleteVendor(id) {
+  const existing = db.prepare('SELECT * FROM vendors WHERE id = ?').get(id);
+  if (!existing) throw new NotFoundError();
+  return transaction(() => {
+    const count = db.prepare('SELECT COUNT(*) AS count FROM inventory WHERE vendorId = ?').get(id).count;
+    db.prepare('DELETE FROM inventory WHERE vendorId = ?').run(id);
+    db.prepare('DELETE FROM vendors WHERE id = ?').run(id);
+    return { removedItemCount: count };
   });
-  res.json({ removedItemCount });
-});
+}
 
 // Inventory
 
-router.get('/inventory', (req, res) => {
-  const { vendorId } = req.query;
-  const items = vendorId
+function listInventory(vendorId) {
+  return vendorId
     ? db.prepare('SELECT * FROM inventory WHERE vendorId = ? ORDER BY createdAt').all(vendorId)
     : db.prepare('SELECT * FROM inventory ORDER BY createdAt').all();
-  res.json(items);
-});
+}
 
-router.post('/inventory', (req, res) => {
-  const { vendorId, name, description, price, quantity } = req.body;
+function createInventoryItem(body) {
+  const { vendorId, name, description, price, quantity } = body;
   const item = {
     id: generateId('i'),
     vendorId,
@@ -84,13 +80,13 @@ router.post('/inventory', (req, res) => {
   db.prepare(
     'INSERT INTO inventory (id, vendorId, name, description, price, quantity, createdAt) VALUES (@id, @vendorId, @name, @description, @price, @quantity, @createdAt)'
   ).run(item);
-  res.status(201).json(item);
-});
+  return item;
+}
 
-router.patch('/inventory/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM inventory WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not_found' });
-  const updated = { ...existing, ...req.body, id: existing.id };
+function updateInventoryItem(id, body) {
+  const existing = db.prepare('SELECT * FROM inventory WHERE id = ?').get(id);
+  if (!existing) throw new NotFoundError();
+  const updated = { ...existing, ...body, id: existing.id };
   db.prepare(
     'UPDATE inventory SET vendorId = @vendorId, name = @name, description = @description, price = @price, quantity = @quantity WHERE id = @id'
   ).run({
@@ -101,35 +97,36 @@ router.patch('/inventory/:id', (req, res) => {
     quantity: updated.quantity,
     id: updated.id,
   });
-  res.json(updated);
-});
+  return updated;
+}
 
-router.delete('/inventory/:id', (req, res) => {
-  const existing = db.prepare('SELECT * FROM inventory WHERE id = ?').get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'not_found' });
-  db.prepare('DELETE FROM inventory WHERE id = ?').run(req.params.id);
-  res.status(204).end();
-});
+function deleteInventoryItem(id) {
+  const existing = db.prepare('SELECT * FROM inventory WHERE id = ?').get(id);
+  if (!existing) throw new NotFoundError();
+  db.prepare('DELETE FROM inventory WHERE id = ?').run(id);
+}
 
 // Settings
 
-router.get('/settings', (req, res) => {
-  res.json(db.prepare('SELECT taxRate FROM settings WHERE id = 1').get());
-});
+function getSettings() {
+  return db.prepare('SELECT taxRate FROM settings WHERE id = 1').get();
+}
 
-router.put('/settings', (req, res) => {
-  const { taxRate } = req.body;
+function updateSettings(body) {
+  const { taxRate } = body;
   db.prepare('UPDATE settings SET taxRate = ? WHERE id = 1').run(taxRate);
-  res.json({ taxRate });
-});
+  return { taxRate };
+}
 
 // Sales — atomic checkout: validate every line has stock, decrement all of them,
 // and record the sale in a single transaction. Either everything commits or nothing does.
 
-router.post('/sales', (req, res) => {
-  const { lines } = req.body;
+function checkout(body) {
+  const { lines } = body;
   if (!Array.isArray(lines) || lines.length === 0) {
-    return res.status(400).json({ error: 'empty_cart' });
+    const err = new Error('empty_cart');
+    err.status = 400;
+    throw err;
   }
 
   const selectItem = db.prepare('SELECT * FROM inventory WHERE id = ?');
@@ -141,11 +138,11 @@ router.post('/sales', (req, res) => {
     'INSERT INTO sale_line_items (id, saleId, itemId, vendorId, name, unitPrice, quantity) VALUES (@id, @saleId, @itemId, @vendorId, @name, @unitPrice, @quantity)'
   );
 
-  function checkout(cartLines) {
+  return transaction(() => {
     const failures = [];
     const resolvedLines = [];
 
-    for (const line of cartLines) {
+    for (const line of lines) {
       const item = selectItem.get(line.itemId);
       if (!item || item.quantity < line.qty) {
         failures.push({
@@ -186,16 +183,43 @@ router.post('/sales', (req, res) => {
     });
 
     return { sale, lines: saleLines };
+  });
+}
+
+// Router: matches (method, path) against the API surface and dispatches to a handler.
+// Returns { status, body } or throws NotFoundError / InsufficientStockError / a plain Error with .status.
+function handleApiRequest(method, pathname, query, body) {
+  const vendorMatch = pathname.match(/^\/vendors\/([^/]+)$/);
+  const inventoryMatch = pathname.match(/^\/inventory\/([^/]+)$/);
+
+  if (pathname === '/vendors' && method === 'GET') return { status: 200, body: listVendors() };
+  if (pathname === '/vendors' && method === 'POST') return { status: 201, body: createVendor(body) };
+  if (vendorMatch && method === 'PATCH') return { status: 200, body: updateVendor(vendorMatch[1], body) };
+  if (vendorMatch && method === 'DELETE') return { status: 200, body: deleteVendor(vendorMatch[1]) };
+
+  if (pathname === '/inventory' && method === 'GET') return { status: 200, body: listInventory(query.vendorId) };
+  if (pathname === '/inventory' && method === 'POST') return { status: 201, body: createInventoryItem(body) };
+  if (inventoryMatch && method === 'PATCH') return { status: 200, body: updateInventoryItem(inventoryMatch[1], body) };
+  if (inventoryMatch && method === 'DELETE') {
+    deleteInventoryItem(inventoryMatch[1]);
+    return { status: 204, body: null };
   }
 
-  try {
-    res.status(201).json(transaction(() => checkout(lines)));
-  } catch (err) {
-    if (err instanceof InsufficientStockError) {
-      return res.status(409).json({ error: 'insufficient_stock', failures: err.failures });
+  if (pathname === '/settings' && method === 'GET') return { status: 200, body: getSettings() };
+  if (pathname === '/settings' && method === 'PUT') return { status: 200, body: updateSettings(body) };
+
+  if (pathname === '/sales' && method === 'POST') {
+    try {
+      return { status: 201, body: checkout(body) };
+    } catch (err) {
+      if (err instanceof InsufficientStockError) {
+        return { status: 409, body: { error: 'insufficient_stock', failures: err.failures } };
+      }
+      throw err;
     }
-    throw err;
   }
-});
 
-module.exports = router;
+  throw new NotFoundError();
+}
+
+module.exports = { handleApiRequest, NotFoundError, InsufficientStockError };
