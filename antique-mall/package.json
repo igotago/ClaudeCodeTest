@@ -1,0 +1,13 @@
+{
+  "name": "antique-mall",
+  "version": "1.0.0",
+  "description": "Antique mall vendor/inventory/POS app",
+  "main": "server/app.js",
+  "scripts": {
+    "start": "node server/app.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "license": "ISC"
+}
